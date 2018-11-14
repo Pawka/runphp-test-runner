@@ -3,19 +3,63 @@
 
 class AssertionFailed extends Exception {}
 
-function assertEqual($expect, $value, $message = null) {
-  if ($expect !== $value) {
-    throw new AssertionFailed("values are not equal: ". $message);
+class Mock {
+
+  private $obj;
+
+  public function __construct($obj) {
+    $this->object = $obj;
+  }
+
+  public function __call($name, $args) {
+    $refl = new ReflectionMethod($this->object, $name);
+    if (!$refl->isPublic()) {
+      $refl->setAccessible(true);
+    }
+    return $refl->invokeArgs($this->object, $args);
   }
 }
 
-class SomeTestCase {
+abstract class RunPHPTestCase {
+
+  protected final function assertEqual($expect, $value, $message = null) {
+    if ($expect !== $value) {
+      if (!$message) {
+        $message = sprintf("expected `%s` got `%s`.",
+          var_export($expect, true),
+          var_export($value, true));
+      }
+      throw new AssertionFailed("values are not equal: ". $message);
+    }
+  }
+
+  protected final function mock($obj) {
+    return new Mock($obj);
+  }
+}
+
+class SomeService {
+  public function returnOne() {
+    return 1;
+  }
+
+  private function returnTwo() {
+    return 2;
+  }
+}
+
+class SomeTestCase extends RunPHPTestCase {
   public function testSomething() {
-    assertEqual(true, false);
+    $this->assertEqual(true, false);
   }
 
   public function testSomethingElse() {
-    assertEqual(1, 1);
+    $this->assertEqual(1, 1);
+  }
+
+  public function testReturnTwo() {
+    $service = $this->mock(new SomeService);
+    $this->assertEqual(2, $service->returnTwo());
   }
 }
 
