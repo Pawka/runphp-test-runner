@@ -118,6 +118,8 @@ class RunPHPRunner {
   public function run($obj) {
     $this->log("Running tests...");
     $this->log(sprintf("%s:", get_class($obj)));
+    xdebug_start_code_coverage(
+      XDEBUG_CC_UNUSED | XDEBUG_CC_DEAD_CODE);
     $methods = $this->getTestMethods($obj);
     foreach ($methods as $method) {
       try {
@@ -127,6 +129,22 @@ class RunPHPRunner {
         $this->log(sprintf("[-] %s: %s", $method, $e->getMessage()));
       }
     }
+
+    $coverage = xdebug_get_code_coverage();
+    xdebug_stop_code_coverage();
+    $this->coverage($coverage, $obj);
+  }
+
+  private function coverage($coverage, $obj) {
+    $refl = new \ReflectionClass($obj);
+    $file = $refl->getFileName();
+
+    $covered = count(array_filter(
+      $coverage[$file], function($val) { return $val === 1; }));
+    $uncovered = count(array_filter(
+      $coverage[$file], function($val) { return $val === -1; }));
+
+    $this->log(sprintf("Coverage: %.2f%%\n", 100*$covered/($covered+$uncovered)));
   }
 
   private function log($message) {
