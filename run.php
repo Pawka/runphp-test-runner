@@ -3,20 +3,47 @@
 
 class AssertionFailed extends Exception {}
 
+class MockMethod {
+
+  private $return;
+
+  public function return($value) {
+    $this->return = $value;
+  }
+
+  /**
+   * Probably better not to make this method public.
+   */
+  public function getValue() {
+    return $this->return;
+  }
+}
+
 class Mock {
 
   private $obj;
+  private $mockedMethods = [];
 
   public function __construct($obj) {
     $this->object = $obj;
   }
 
   public function __call($name, $args) {
+    if (isset($this->mockedMethods[$name])) {
+      return $this->mockedMethods[$name]->getValue();
+    }
+
     $refl = new ReflectionMethod($this->object, $name);
     if (!$refl->isPublic()) {
       $refl->setAccessible(true);
     }
     return $refl->invokeArgs($this->object, $args);
+  }
+
+  public function on($method) {
+    $this->mockedMethods[$method] = new MockMethod;
+
+    return $this->mockedMethods[$method];
   }
 }
 
@@ -38,7 +65,19 @@ abstract class RunPHPTestCase {
   }
 }
 
+class SomeModel {
+  public function getName() {
+    return "Vilnius PHP";
+  }
+}
+
 class SomeService {
+  public $model;
+
+  public function callModel() {
+    return $this->model->getName();
+  }
+
   public function returnOne() {
     return 1;
   }
@@ -60,6 +99,17 @@ class SomeTestCase extends RunPHPTestCase {
   public function testReturnTwo() {
     $service = $this->mock(new SomeService);
     $this->assertEqual(2, $service->returnTwo());
+  }
+
+  public function testCallModel() {
+    $mock = $this->mock(new SomeModel);
+    $mock
+      ->on('getName')
+      ->return("Kaunas PHP");
+
+    $service = new SomeService;
+    $service->model = $mock;
+    $this->assertEqual("Kaunas PHP", $service->callModel());
   }
 }
 
