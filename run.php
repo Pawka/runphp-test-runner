@@ -113,10 +113,43 @@ class SomeTestCase extends RunPHPTestCase {
   }
 }
 
+class OtherTestCase extends RunPHPTestCase {
+  public function testIfTrueIsFalse() {
+    $this->assertEqual(true, false);
+  }
+}
+
 
 class RunPHPRunner {
-  public function run($obj) {
+
+  public function run() {
+    $testCases = $this->getTestCases();
     $this->log("Running tests...");
+    foreach ($testCases as $refl) {
+      $testCase = $refl->newInstance();
+      $this->runTestCase($testCase);
+    }
+  }
+
+  private function getTestCases() {
+    $classes = get_declared_classes();
+
+    $candidates = array_filter($classes, function($val) {
+      return preg_match('/TestCase$/', $val);
+    });
+
+    $testCases = [];
+    foreach ($candidates as $class) {
+      $refl = new \ReflectionClass($class);
+      if ($refl->isInstantiable() && $refl->isSubclassOf('RunPHPTestCase')) {
+        $testCases[] = $refl;
+      }
+    }
+
+    return $testCases;
+  }
+
+  private function runTestCase(RunPHPTestCase $obj) {
     $this->log(sprintf("%s:", get_class($obj)));
     xdebug_start_code_coverage(
       XDEBUG_CC_UNUSED | XDEBUG_CC_DEAD_CODE);
@@ -163,6 +196,5 @@ class RunPHPRunner {
   }
 }
 
-$testCase = new SomeTestCase;
 $runner = new RunPHPRunner;
-$runner->run($testCase);
+$runner->run();
